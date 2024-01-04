@@ -1,68 +1,57 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Text, View, StyleSheet, Platform } from 'react-native';
 import * as Battery from 'expo-battery';
-import { useEffect, useState } from 'react';
 import { Audio } from 'expo-av';
 
+
 export default function App() {
-  const [isAvailable, setIsAvailable] = useState(false);
-  const [batteryInfo, setBatteryInfo] = useState(undefined);
-  const [sound, setSound] = useState(null);
-  const [played, setPlayed] = useState(false);
 
-  useEffect(() => {
-    async function checkAvailability() {
-      const isBatteryAvailable = await Battery.isAvailableAsync();
-      setIsAvailable(isBatteryAvailable);
-      if (isBatteryAvailable) {
-        const batteryInfoLoaded = await Battery.getPowerStateAsync();
-        setBatteryInfo(batteryInfoLoaded);
-
-        if (Math.round(batteryInfoLoaded.batteryLevel * 100) === 86) {
-          playSound(); // Play sound if battery level is 86%
-          setPlayed(true); // Set played to true to prevent repeated plays
-        }
-      }
-    }
-    checkAvailability();
-  }, [played]);
-
-  useEffect(() => {
-    return () => {
-      if (sound) {
-        sound.unloadAsync(); // Unload the sound when the component unmounts
-      }
-    };
-  }, [sound]);
-
-  const playSound = async () => {
+  const [batteryLevel, setBatteryLevel] = useState(null);
+  var playNow = false;
+  var isPlaying = false;
+  async function playAudio() {
+    const soundObject = new Audio.Sound();
     try {
-      const { sound } = await Audio.Sound.createAsync(
-        require('./assets/notification_sound.mp3') // Replace with your sound file
-      );
-      setSound(sound);
-      await sound.playAsync();
+      await soundObject.loadAsync(require('../batteryapp/assets/5.mp3'));
+      if (playNow == true){
+        await soundObject.playAsync();
+        isPlaying = true;
+      }
+      // await soundObject.unloadAsync(); // Clean up after playing
     } catch (error) {
-      console.error('Error playing sound:', error);
+      console.error('Failed to play sound', error);
     }
-  };
+  }
+  // playAudio();
 
-  const showBatteryInfo = () => {
-    if (!batteryInfo) return <Text>Battery info not loaded</Text>;
-    return (
-      <View>
-        <Text style={styles.goldText}>Low Power Mode: {batteryInfo.lowPowerMode ? 'Yes' : 'No'}</Text>
-        <Text style={styles.goldText}>Battery Level: {Math.round(batteryInfo.batteryLevel * 100)}%</Text>
-        <Text style={styles.goldText}>Battery State: {batteryInfo.batteryState}</Text>
-      </View>
-    );
-  };
+  useEffect(() => {
+    const fetchBatteryLevel = () => {
+      Battery.getBatteryLevelAsync().then(level => {
+        setBatteryLevel(level);
+        console.log(level);
+        if (Math.round(level * 100) >= 80) {
+          playNow = true;
+          isPlaying? console.log('playing') : playAudio();
+        }
+          
+      })
+    }
 
+    fetchBatteryLevel();
+
+    const intervalID = setInterval( () => {
+      fetchBatteryLevel()
+    }, 2000);
+
+
+    return () => {
+      clearInterval(intervalID);
+    }
+
+  }, []);
   return (
     <View style={styles.container}>
-      <Text style={styles.goldText}>{isAvailable ? 'Battery Details: ' : 'Battery info unavailable'}</Text>
-      {showBatteryInfo()}
-      <StatusBar style="auto" />
+      <Text style={styles.text}>Battery : {Math.round(batteryLevel * 100)}%</Text>
     </View>
   );
 }
@@ -70,12 +59,14 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff', // Black background color
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    // backgroundColor: '#fff',
+    backgroundColor: '#000',
   },
-  goldText: {
-    color: 'coral', // Gold text color
-    marginBottom: 8, // Add space between text elements
+  text: {
+    // color: 'black', 
+    color: 'white', 
+    fontSize:40,
   },
 });
